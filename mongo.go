@@ -71,7 +71,7 @@ func New(ctx context.Context, uri string, dbName string, opts ...Option) (*Mongo
 	}, nil
 }
 
-func (m *MongoDS) Batch() (datastore.Batch, error) {
+func (m *MongoDS) Batch(_ context.Context) (datastore.Batch, error) {
 	return &mongoBatch{
 		ds:      m,
 		deletes: map[datastore.Key]struct{}{},
@@ -79,19 +79,19 @@ func (m *MongoDS) Batch() (datastore.Batch, error) {
 	}, nil
 }
 
-func (m *MongoDS) Put(key datastore.Key, val []byte) error {
+func (m *MongoDS) Put(ctx context.Context, key datastore.Key, val []byte) error {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
 		return ErrClosed
 	}
 
-	ctx, cls := context.WithTimeout(context.Background(), m.opTimeout)
+	ctx, cls := context.WithTimeout(ctx, m.opTimeout)
 	defer cls()
 	return m.put(ctx, key, val)
 }
 
-func (m *MongoDS) Has(key datastore.Key) (bool, error) {
+func (m *MongoDS) Has(ctx context.Context, key datastore.Key) (bool, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
@@ -103,11 +103,11 @@ func (m *MongoDS) Has(key datastore.Key) (bool, error) {
 	return m.has(ctx, key)
 }
 
-func (m *MongoDS) Sync(datastore.Key) error {
+func (m *MongoDS) Sync(context.Context, datastore.Key) error {
 	return nil
 }
 
-func (m *MongoDS) GetSize(key datastore.Key) (int, error) {
+func (m *MongoDS) GetSize(ctx context.Context, key datastore.Key) (int, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
@@ -119,7 +119,7 @@ func (m *MongoDS) GetSize(key datastore.Key) (int, error) {
 	return m.getSize(ctx, key)
 }
 
-func (m *MongoDS) Get(key datastore.Key) ([]byte, error) {
+func (m *MongoDS) Get(ctx context.Context, key datastore.Key) ([]byte, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
@@ -130,7 +130,7 @@ func (m *MongoDS) Get(key datastore.Key) ([]byte, error) {
 	return m.get(ctx, key)
 }
 
-func (m *MongoDS) Delete(key datastore.Key) error {
+func (m *MongoDS) Delete(ctx context.Context, key datastore.Key) error {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
@@ -142,6 +142,7 @@ func (m *MongoDS) Delete(key datastore.Key) error {
 	return m.delete(ctx, key)
 }
 
+// todo: add context after patching the dsextensions pkg
 func (m *MongoDS) QueryExtended(q dsextensions.QueryExt) (query.Results, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -155,14 +156,14 @@ func (m *MongoDS) QueryExtended(q dsextensions.QueryExt) (query.Results, error) 
 	return m.query(ctx, q)
 }
 
-func (m *MongoDS) Query(q query.Query) (query.Results, error) {
+func (m *MongoDS) Query(ctx context.Context, q query.Query) (query.Results, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
 		return nil, ErrClosed
 	}
 
-	ctx, cls := context.WithTimeout(context.Background(), m.opTimeout)
+	ctx, cls := context.WithTimeout(ctx, m.opTimeout)
 	defer cls()
 
 	qe := dsextensions.QueryExt{Query: q}

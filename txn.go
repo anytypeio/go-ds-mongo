@@ -30,7 +30,7 @@ type mongoTxn struct {
 
 var _ dsextensions.TxnExt = (*mongoTxn)(nil)
 
-func (m *MongoDS) NewTransaction(readOnly bool) (datastore.Txn, error) {
+func (m *MongoDS) NewTransaction(_ context.Context, readOnly bool) (datastore.Txn, error) {
 	return m.newTransaction(readOnly)
 }
 
@@ -61,81 +61,82 @@ func (m *MongoDS) newTransaction(bool) (dsextensions.TxnExt, error) {
 	}, nil
 }
 
-func (t *mongoTxn) Commit() error {
+func (t *mongoTxn) Commit(ctx context.Context) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return ErrTxnFinalized
 	}
 
-	ctx, cls := context.WithTimeout(context.Background(), t.m.txnTimeout)
+	ctx1, cls := context.WithTimeout(ctx, t.m.txnTimeout)
 	defer cls()
-	if err := t.session.CommitTransaction(ctx); err != nil {
+	if err := t.session.CommitTransaction(ctx1); err != nil {
 		return fmt.Errorf("commiting session txn: %s", err)
 	}
 	t.finalized = true
-	ctx, cls = context.WithTimeout(context.Background(), t.m.opTimeout)
+	ctx1, cls = context.WithTimeout(ctx, t.m.opTimeout)
 	defer cls()
-	t.session.EndSession(ctx)
+	t.session.EndSession(ctx1)
 
 	return nil
 }
 
-func (t *mongoTxn) Discard() {
+func (t *mongoTxn) Discard(ctx context.Context) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return
 	}
 
-	ctx, cls := context.WithTimeout(context.Background(), t.m.txnTimeout)
+	ctx1, cls := context.WithTimeout(ctx, t.m.txnTimeout)
 	defer cls()
-	if err := t.session.AbortTransaction(ctx); err != nil {
+	if err := t.session.AbortTransaction(ctx1); err != nil {
 		log.Errorf("aborting transaction: %s", err)
 	}
 
-	ctx, cls = context.WithTimeout(context.Background(), t.m.opTimeout)
+	ctx1, cls = context.WithTimeout(ctx, t.m.opTimeout)
 	defer cls()
-	t.session.EndSession(ctx)
+	t.session.EndSession(ctx1)
 }
 
-func (t *mongoTxn) Get(key datastore.Key) ([]byte, error) {
+func (t *mongoTxn) Get(ctx context.Context, key datastore.Key) ([]byte, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return nil, ErrTxnFinalized
 	}
-	return t.m.get(t.ctx, key)
+	return t.m.get(ctx, key)
 }
 
-func (t *mongoTxn) Has(key datastore.Key) (bool, error) {
+func (t *mongoTxn) Has(ctx context.Context, key datastore.Key) (bool, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return false, ErrTxnFinalized
 	}
-	return t.m.has(t.ctx, key)
+	return t.m.has(ctx, key)
 }
 
-func (t *mongoTxn) GetSize(key datastore.Key) (int, error) {
+func (t *mongoTxn) GetSize(ctx context.Context, key datastore.Key) (int, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return 0, ErrTxnFinalized
 	}
-	return t.m.getSize(t.ctx, key)
+	return t.m.getSize(ctx, key)
 }
 
-func (t *mongoTxn) Query(q query.Query) (query.Results, error) {
+func (t *mongoTxn) Query(ctx context.Context, q query.Query) (query.Results, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return nil, ErrTxnFinalized
 	}
 	qe := dsextensions.QueryExt{Query: q}
-	return t.m.query(t.ctx, qe)
+	return t.m.query(ctx, qe)
 }
 
+// todo: add context after patching the dsextensions pkg
 func (t *mongoTxn) QueryExtended(q dsextensions.QueryExt) (query.Results, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -145,20 +146,20 @@ func (t *mongoTxn) QueryExtended(q dsextensions.QueryExt) (query.Results, error)
 	return t.m.query(t.ctx, q)
 }
 
-func (t *mongoTxn) Delete(key datastore.Key) error {
+func (t *mongoTxn) Delete(ctx context.Context, key datastore.Key) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return ErrClosed
 	}
-	return t.m.delete(t.ctx, key)
+	return t.m.delete(ctx, key)
 }
 
-func (t *mongoTxn) Put(key datastore.Key, val []byte) error {
+func (t *mongoTxn) Put(ctx context.Context, key datastore.Key, val []byte) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return ErrClosed
 	}
-	return t.m.put(t.ctx, key, val)
+	return t.m.put(ctx, key, val)
 }
