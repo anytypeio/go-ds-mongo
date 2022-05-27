@@ -43,16 +43,16 @@ func TestQuerySeek(t *testing.T) {
 		{"/2/2", []byte("2.2")},
 	}
 	for _, d := range data {
-		err := ds.Put(datastore.NewKey(d.key), d.value)
+		err := ds.Put(context.Background(), datastore.NewKey(d.key), d.value)
 		require.NoError(t, err)
 	}
 
 	cases := []dsextensions.QueryExt{
-		{},                                                     // All
-		{SeekPrefix: "/1/1"},                                   // All from /1/1
-		{SeekPrefix: "/1/3"},                                   // All from mid /1 key
+		{},                   // All
+		{SeekPrefix: "/1/1"}, // All from /1/1
+		{SeekPrefix: "/1/3"}, // All from mid /1 key
 		{Query: query.Query{Prefix: "/1"}, SeekPrefix: "/1/2"}, // All from /1/2 but only in /1 space.
-		{SeekPrefix: "/2/2"},                                   // Only /2/2
+		{SeekPrefix: "/2/2"}, // Only /2/2
 		{SeekPrefix: "/5/1"},
 	}
 	// Automatically include descending order tests
@@ -92,7 +92,7 @@ func TestQuerySeek(t *testing.T) {
 	for i, q := range cases {
 		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
 			result := expectedResult(q)
-			res, err := ds.QueryExtended(q)
+			res, err := ds.QueryExtended(context.Background(), q)
 			require.NoError(t, err)
 			all, err := res.Rest()
 			require.NoError(t, err)
@@ -107,16 +107,16 @@ func TestQuerySeek(t *testing.T) {
 func TestTxnDiscard(t *testing.T) {
 	ds := createMongoDS(t, test.GetMongoUri())
 
-	txn, err := ds.NewTransaction(false)
+	txn, err := ds.NewTransaction(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	key := datastore.NewKey("/test/thingdiscard")
-	if err := txn.Put(key, []byte{1, 2, 3}); err != nil {
+	if err := txn.Put(context.Background(), key, []byte{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
-	txn.Discard()
-	has, err := ds.Has(key)
+	txn.Discard(context.Background())
+	has, err := ds.Has(context.Background(), key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,19 +132,19 @@ func TestTxnDiscard(t *testing.T) {
 func TestTxnCommit(t *testing.T) {
 	ds := createMongoDS(t, test.GetMongoUri())
 
-	txn, err := ds.NewTransaction(false)
+	txn, err := ds.NewTransaction(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	key := datastore.NewKey("/test/thingcommit")
-	if err := txn.Put(key, []byte{1, 2, 3}); err != nil {
+	if err := txn.Put(context.Background(), key, []byte{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
-	err = txn.Commit()
+	err = txn.Commit(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	has, err := ds.Has(key)
+	has, err := ds.Has(context.Background(), key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestTxnCommit(t *testing.T) {
 func TestTxnBatch(t *testing.T) {
 	ds := createMongoDS(t, test.GetMongoUri())
 
-	txn, err := ds.NewTransaction(false)
+	txn, err := ds.NewTransaction(context.Background(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,18 +174,18 @@ func TestTxnBatch(t *testing.T) {
 		}
 		data[key] = bytes
 
-		err = txn.Put(key, bytes)
+		err = txn.Put(context.Background(), key, bytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	err = txn.Commit()
+	err = txn.Commit(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for key, bytes := range data {
-		retrieved, err := ds.Get(key)
+		retrieved, err := ds.Get(context.Background(), key)
 		if err != nil {
 			t.Fatal(err)
 		}

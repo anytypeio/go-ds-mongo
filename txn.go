@@ -34,11 +34,11 @@ func (m *MongoDS) NewTransaction(_ context.Context, readOnly bool) (datastore.Tx
 	return m.newTransaction(readOnly)
 }
 
-func (m *MongoDS) NewTransactionExtended(readOnly bool) (dsextensions.TxnExt, error) {
+func (m *MongoDS) NewTransactionExtended(_ context.Context, readOnly bool) (dsextensions.TxnExt, error) {
 	return m.newTransaction(readOnly)
 }
 
-func (m *MongoDS) newTransaction(bool) (dsextensions.TxnExt, error) {
+func (m *MongoDS) newTransaction(_ bool) (dsextensions.TxnExt, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	if m.closed {
@@ -136,14 +136,13 @@ func (t *mongoTxn) Query(ctx context.Context, q query.Query) (query.Results, err
 	return t.m.query(ctx, qe)
 }
 
-// todo: add context after patching the dsextensions pkg
-func (t *mongoTxn) QueryExtended(q dsextensions.QueryExt) (query.Results, error) {
+func (t *mongoTxn) QueryExtended(ctx context.Context, q dsextensions.QueryExt) (query.Results, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.finalized {
 		return nil, ErrTxnFinalized
 	}
-	return t.m.query(t.ctx, q)
+	return t.m.query(ctx, q)
 }
 
 func (t *mongoTxn) Delete(ctx context.Context, key datastore.Key) error {
